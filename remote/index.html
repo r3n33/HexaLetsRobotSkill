@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>LetsRobotSkill</title>
+		<script type="text/javascript" src="mind-framework.js"></script>
+		<script type="text/javascript">
+			mind.init({callback: function(robot){
+				skillID="LetsRobotSkill";
+				robot.connectSkill({
+					skillID: skillID
+				});
+				document.getElementById("connect").onclick = function() {
+					robot.sendData({
+						skillID: skillID, 
+						data: {"robotid":document.getElementById('robot_id').value, "cameraid":document.getElementById('camera_id').value}
+					})
+				}
+				document.getElementById("disconnect").onclick = function() {
+					robot.sendData({
+						skillID: skillID, 
+						data: "disconnect"
+					})
+				}
+			}});
+		</script>
+	</head>
+	<body bgcolor="363636">
+		<img id="img" alt="img" src="LogoLong.png" /><br/>
+
+		<table>
+		<tr>
+			<td></td>
+			<td></td>
+		</tr>
+		<tr>
+			<td>ROBOT_ID:</td>
+			<td><input type="text" id="robot_id" name="robot_id" value="22328591"></td>
+		</tr>
+		<tr>
+			<td>CAMERA_ID:</td>
+			<td><input type="text" id="camera_id" name="camera_id" value="13303408"></td>
+		</tr>
+		<tr>
+			<td><button id="connect">Open Connection</button></td>
+			<td><button id="disconnect">Disconnect</button></td>
+		</tr>
+
+		</table>
+	</body>
+</html>

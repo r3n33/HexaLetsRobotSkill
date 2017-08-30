@@ -1,0 +1,47 @@
+[  
+   {  
+      "button_panels":[  
+         {  
+            "button_panel_label":"movement",
+            "buttons":[  
+               {  
+                  "label":"left",
+                  "command":"L"
+               },
+               {  
+                  "label":"right",
+                  "command":"R"
+               },
+               {  
+                  "label":"forward",
+                  "command":"F"
+               },
+               {  
+                  "label":"reverse",
+                  "command":"B"
+               }
+            ]
+         },
+         {  
+            "button_panel_label":"controls",
+            "buttons":[  
+               {  
+                  "label":"Faster",
+                  "command":"Faster"
+               },
+               {  
+                  "label":"Slower",
+                  "command":"Slower"
+               },
+               {  
+                  "label":"Light On",
+                  "command":"LightOn"
+               },{  
+                  "label":"Light Off",
+                  "command":"LightOff"
+               }
+            ]
+         }
+      ]
+   }
+]
