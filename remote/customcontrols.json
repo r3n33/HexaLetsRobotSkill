@@ -36,9 +36,18 @@
                {  
                   "label":"Light On",
                   "command":"LightOn"
-               },{  
+               },
+               {  
                   "label":"Light Off",
                   "command":"LightOff"
+               },
+               {  
+                  "label":"March Gait",
+                  "command":"StartMarch"
+               },
+               {  
+                  "label":"Walk Gait",
+                  "command":"StopMarch"
                }
             ]
          }
