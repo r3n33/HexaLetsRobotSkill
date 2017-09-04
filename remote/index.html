@@ -4,52 +4,88 @@
 		<title>LetsRobotSkill</title>
 		<script type="text/javascript" src="mind-framework.js"></script>
 		<script type="text/javascript">
-			mind.init({callback: function(robot){
-				skillID="LetsRobotSkill";
-				robot.connectSkill({
-					skillID: skillID
-				});
-				document.getElementById("connect").onclick = function() {
-					robot.sendData({
-						skillID: skillID, 
-						data: {"robotid":document.getElementById('robot_id').value, "cameraid":document.getElementById('camera_id').value}
+			storage = window.localStorage;
+
+			window.onload = function(){
+				document.getElementById("robotid").value = storage.getItem("robotid");
+				document.getElementById("cameraid").value = storage.getItem("cameraid");
+			};
+			
+			mind.init({
+				callback: function(robot){
+					skillID="LetsRobotSkill";
+					robot.connectSkill({
+						skillID: skillID
+					});
+					document.getElementById("connect").onclick = function() {
+						storage.setItem("robotid",document.getElementById('robotid').value);
+						storage.setItem("cameraid",document.getElementById('cameraid').value);
+						robot.sendData({
+							skillID: skillID, 
+							data: {"robotid":storage.getItem("robotid"), "cameraid":storage.getItem("cameraid")}
+						})
+
+						document.getElementById("loginpanel").style.display = "none"
+						document.getElementById("consolepanel").style = ""						
+					}
+					document.getElementById("disconnect").onclick = function() {
+						robot.sendData({
+							skillID: skillID, 
+							data: "disconnect"
+						})
+
+						document.getElementById("loginpanel").style = ""
+						document.getElementById("consolepanel").style.display = "none"
+					}
+					setInterval(function(){ 
+						robot.getInfo({
+						  callback: function(info) { 
+						  	alert(JSON.stringify(info, null, 4));
+						  },
+						  error: function(err) { alert(err) }
+						})
+					}, 5000000000);
+
+					robot.onRecvSkillData(function(skillID, data) {
+						document.getElementById("consoletext").value +=data+ "\n"
+						var textarea = document.getElementById('consoletext');
+						textarea.scrollTop = textarea.scrollHeight;
 					})
 				}
-				document.getElementById("disconnect").onclick = function() {
-					robot.sendData({
-						skillID: skillID, 
-						data: "disconnect"
-					})
-				}
-			}});
+			});
 		</script>
 	</head>
 	<body bgcolor="363636">
 		<h2>&nbsp;</h2>
 		<img id="img" alt="img" src="LogoLong.png" style="max-width: 100%;"/><br/>
 
-		<table style="margin: 0px auto;">
-		<tr>
-			<td>&nbsp;</td>
-			<td></td>
-		</tr>
-		<tr>
-			<td>ROBOT_ID:</td>
-			<td><input type="text" id="robot_id" name="robot_id" value="22328591"></td>
-		</tr>
-		<tr>
-			<td>CAMERA_ID:</td>
-			<td><input type="text" id="camera_id" name="camera_id" value="13303408"></td>
-		</tr>
-		<tr>
-			<td colspan="2">&nbsp;</td>
-		</tr>
-		<tr>
-			<td colspan="2" align="center"><button id="connect">Open Connection</button></td>
-		</tr>
-		<tr>
-			<td colspan="2" align="center"><button id="disconnect">Close Connection</button></td>
-		</tr>
-		</table>
+		<div id="loginpanel">
+			<table style="margin: 0px auto;">
+			<tr>
+				<td>&nbsp;</td>
+				<td></td>
+			</tr>
+			<tr>
+				<td>ROBOT_ID:</td>
+				<td><input type="text" id="robotid" name="robotid" value=""></td><!--22328591-->
+			</tr>
+			<tr>
+				<td>CAMERA_ID:</td>
+				<td><input type="text" id="cameraid" name="cameraid" value=""></td><!--13303408-->
+			</tr>
+			<tr>
+				<td colspan="2">&nbsp;</td>
+			</tr>
+			<tr>
+				<td colspan="2" align="center"><button id="connect">Open Connection</button></td>
+			</tr>
+			</table>
+		</div>
+		<div style="width:90%;display:none" id="consolepanel" align="center">
+		    <textarea id="consoletext" style="color:white;width:95%; height:250px;white-space: pre; overflow: scroll;resize: none;background-color: rgba(0, 0, 0, 0); border-color: rgba(0, 0, 0, 0)" wrap="off"></textarea>
+		</div>
+		<div align="center">
+			<button id="disconnect">Close Connection</button>
+		</div>
 	</body>
 </html>

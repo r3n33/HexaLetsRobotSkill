@@ -19,12 +19,7 @@
                {  
                   "label":"reverse",
                   "command":"B"
-               }
-            ]
-         },
-         {  
-            "button_panel_label":"controls",
-            "buttons":[  
+               },
                {  
                   "label":"Faster",
                   "command":"Faster"
@@ -32,6 +27,27 @@
                {  
                   "label":"Slower",
                   "command":"Slower"
+               }
+            ]
+         },
+         {  
+            "button_panel_label":"controls",
+            "buttons":[
+               {  
+                  "label":"Pitch Up",
+                  "command":"PitchUp"
+               },
+               {  
+                  "label":"Pitch Down",
+                  "command":"PitchDown"
+               },
+               {  
+                  "label":"Taller",
+                  "command":"HeightUp"
+               },
+               {  
+                  "label":"Shorter",
+                  "command":"HeightDown"
                },
                {  
                   "label":"Light On",
@@ -42,11 +58,24 @@
                   "command":"LightOff"
                },
                {  
-                  "label":"March Gait",
+                  "label":"High Step",
                   "command":"StartMarch"
+               }
+            ]
+         },
+         {  
+            "button_panel_label":"defaults",
+            "buttons":[ 
+               {  
+                  "label":"Level Body",
+                  "command":"StopPitch"
                },
                {  
-                  "label":"Walk Gait",
+                  "label":"Normal Height",
+                  "command":"StopHeight"
+               }, 
+               {  
+                  "label":"Normal Step",
                   "command":"StopMarch"
                }
             ]

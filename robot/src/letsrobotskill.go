@@ -15,6 +15,7 @@ import (
 	"mind/core/framework/drivers/infrared"
 	"mind/core/framework/log"
 	"mind/core/framework/skill"
+	"mind/core/framework"
 
 	"github.com/graarh/golang-socketio/transport"
 	"github.com/graarh/golang-socketio"
@@ -28,12 +29,20 @@ type RobotCommand struct {
 	UsersName	string 	`json:"username"`
 }
 
+type ChatMessage struct {
+	Message 	string 	`json:"message"`
+	AnonUser	bool	`json:"anonymous"`
+}
+
 type LetsRobotSkill struct {
 	skill.Base
 	myClient *gosocketio.Client
 	currentHeading float64
+	currentHeight float64
 	currentMoveSpeed int
+	currentPitch float64
 	allowAnonControl bool
+	allowAnonChat bool
 
 	myRobotID string
 	myCameraID string
@@ -53,12 +62,16 @@ func NewSkill() skill.Interface {
 }
 
 func (d *LetsRobotSkill) OnStart() {
-	log.Info.Println("OnStart()")
+	d.LogSomethingInfo("OnStart()")
 
+	d.allowAnonControl = false
+	d.allowAnonChat = false
 	d.streamingVideo = false
 	d.timerRunning = false
 	d.ffmpegPID = 0
+	d.currentHeight = 50.0
 	d.currentMoveSpeed = 500
+	d.currentPitch = 0.0
 	d.nextControlTime = time.Now().Add(100 * time.Millisecond)
 
 	hexabody.Start()
@@ -68,7 +81,7 @@ func (d *LetsRobotSkill) OnStart() {
 }
 
 func (d *LetsRobotSkill) OnClose() {
-	log.Info.Println("OnClose()")
+	d.LogSomethingInfo("OnClose()")
 
 	d.Disconnect()
 
@@ -78,18 +91,18 @@ func (d *LetsRobotSkill) OnClose() {
 }
 
 func (d *LetsRobotSkill) OnConnect() {
-	log.Info.Println("OnConnect()")
+	d.LogSomethingInfo("OnConnect()")
 
 	hexabody.MoveHead(0, 0)
 	d.currentMoveSpeed = 500
 }
 
 func (d *LetsRobotSkill) OnDisconnect() {
-	log.Info.Println("OnDisconnect()")
+	d.LogSomethingInfo("OnDisconnect()")
 }
 
 func (d *LetsRobotSkill) OnRecvJSON(data []byte) {
-	log.Info.Println("OnRecvJSON()")
+	d.LogSomethingInfo("OnRecvJSON()")
 
 	var msg interface{}
 	err := json.Unmarshal([]byte(data), &msg)
@@ -99,31 +112,22 @@ func (d *LetsRobotSkill) OnRecvJSON(data []byte) {
 	}
 	if roboid, ok := message["robotid"].(string); ok {
 		d.myRobotID = roboid
+		d.LogSomethingInfo("OnRecvJSON d.myRobotID: " + roboid)
     }
 	if camid, ok := message["cameraid"].(string); ok {
 		d.myCameraID = camid
+		d.LogSomethingInfo("OnRecvJSON d.myCameraID: " + camid)
     }
 
-    log.Info.Println("OnRecvJSON d.myRobotID:", d.myRobotID)
-    log.Info.Println("OnRecvJSON d.myCameraID:", d.myCameraID)
-
-    log.Info.Println("d.getControlHostPort()")
     d.getControlHostPort()
-    log.Info.Println("d.getVideoPort()")
-    d.getVideoPort()
-
-    log.Info.Println("d.connectSocketIO()")
-    go d.connectSocketIO()
-      
-    log.Info.Println("d.StartFFmpeg()")
+	d.getVideoPort()
+	go d.connectSocketIO()
     go d.StartFFmpeg()
-
-    log.Info.Println("d.SendLetsRobotStatus()")
 	go d.SendLetsRobotStatus()
 }
 
 func (d *LetsRobotSkill) OnRecvString(data string) {
-	log.Info.Println("OnRecvString()")
+	d.LogSomethingInfo("OnRecvString()")
 
 	switch data {
 	case "disconnect":
@@ -134,7 +138,7 @@ func (d *LetsRobotSkill) OnRecvString(data string) {
 }
 
 func (d *LetsRobotSkill) Disconnect() {
-	log.Info.Println("Disconnect()")
+	d.LogSomethingInfo("Disconnect()")
 
 	if d.timerRunning == true {
 		d.intervalTimer.Stop()
@@ -144,9 +148,19 @@ func (d *LetsRobotSkill) Disconnect() {
 		d.KillFFmpeg()
 	}
 	
-	log.Info.Println("Closing socket.io connection")
+	d.LogSomethingInfo("Disconnect(): Closing socket.io connection")
 	d.myClient.Close()
-	log.Info.Println("Socket.io connection closed")
+	d.LogSomethingInfo("Disconnect(): Socket.io connection closed")
+}
+
+func (d *LetsRobotSkill) LogSomethingInfo( info string ){
+	log.Info.Println(info);
+	framework.SendString(info)
+}
+
+func (d *LetsRobotSkill) LogSomethingError( info string ){
+	log.Fatal.Println(info);
+	framework.SendString(info)
 }
 
 func HeadingWrap( direction float64 ) float64 {
@@ -162,12 +176,11 @@ func HeadingWrap( direction float64 ) float64 {
 func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 	diff := d.nextControlTime.Sub(time.Now())
 	if diff > 0 {
-		log.Info.Println("HexaDoCommand() rate limited. Ignoring.")
 		return
 	}
 	d.nextControlTime = time.Now().Add(100 * time.Millisecond)
 	
-	log.Info.Println("HexaDoCommand(): ", cmd)
+	//d.LogSomethingInfo("HexaDoCommand(): " + cmd )
 	switch cmd {
 	case "F":
 		hexabody.Walk( d.currentHeading, d.currentMoveSpeed )
@@ -176,9 +189,15 @@ func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 	case "L":
 		d.currentHeading = HeadingWrap( d.currentHeading + 5.0 )
 		hexabody.MoveHead( d.currentHeading, d.currentMoveSpeed )
+		if d.currentPitch != 0.0 {
+			hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
+		}
 	case "R":
 		d.currentHeading = HeadingWrap( d.currentHeading - 5.0 )
 		hexabody.MoveHead( d.currentHeading, d.currentMoveSpeed )
+		if d.currentPitch != 0.0 {
+			hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
+		}
 	case "Faster":
 		if d.currentMoveSpeed > 300 {
 			d.currentMoveSpeed -= 100
@@ -195,6 +214,33 @@ func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 		hexabody.StartMarching()
 	case "StopMarch":
 		hexabody.StopMarching()
+	case "PitchUp":
+		if d.currentPitch < 30.0 {
+			d.currentPitch += 5.0
+		}
+		hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
+	case "PitchDown":
+		if d.currentPitch > -30.0 {
+			d.currentPitch -= 5.0
+		}	
+		hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
+	case "StopPitch":
+		d.currentPitch = 0.0
+		hexabody.StopPitch() //NOTE: StopPitch() does not auto return body to level
+		hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
+	case "HeightUp":
+		if d.currentHeight < 100.0 {
+			d.currentHeight += 10.0
+		}
+		hexabody.StandWithHeight( d.currentHeight )
+	case "HeightDown":
+		if d.currentHeight > 10.0 {
+			d.currentHeight -= 10.0
+		}	
+		hexabody.StandWithHeight( d.currentHeight )
+	case "StopHeight":
+		d.currentHeight = 50.0
+		hexabody.Stand()
 	default:
 		log.Warn.Println("HexaDoCommand() received something unexpected: ", cmd)
 	}
@@ -217,7 +263,7 @@ func (d *LetsRobotSkill) connectSocketIO() {
 	
 	err = d.myClient.On("command_to_robot", func(h *gosocketio.Channel, args RobotCommand) {
 		if d.myRobotID == args.RobotId {
-			//log.Info.Println("SocketIO received: command_to_robot: ", args)
+			//d.LogSomethingInfo("SocketIO received: command_to_robot: ", args)
 
 			if args.KeyPosition != "up" && (args.AnonUser == false || d.allowAnonControl == true ){
 				d.HexaDoCommand( args.Command )
@@ -228,10 +274,19 @@ func (d *LetsRobotSkill) connectSocketIO() {
 		log.Fatal.Println(err)
 	}
 
+	/* TODO: Chat support
+	err = d.myClient.On("chat_message_with_name", func(h *gosocketio.Channel, args ChatMessage) {
+		framework.SendString(args.Message)
+	})
+	if err != nil {
+		log.Fatal.Println(err)
+	}
+	*/
+
 	err = d.myClient.On(gosocketio.OnDisconnection, func(h *gosocketio.Channel) {
 		log.Fatal.Println("Disconnected")
 		if d.streamingVideo == true {
-			log.Info.Println("Disconnected by error.. Will reconnect...")
+			d.LogSomethingInfo("Disconnected by error.. Will reconnect...")
 			time.Sleep(time.Second)
 			d.connectSocketIO()
 			return
@@ -242,7 +297,7 @@ func (d *LetsRobotSkill) connectSocketIO() {
 	}
 
 	err = d.myClient.On(gosocketio.OnConnection, func(h *gosocketio.Channel) {
-		log.Info.Println("connectSocketIO(): Connected")
+		d.LogSomethingInfo("connectSocketIO(): Connected")
 	})
 	if err != nil {
 		log.Fatal.Println(err)
@@ -250,6 +305,7 @@ func (d *LetsRobotSkill) connectSocketIO() {
 }
 
 func (d *LetsRobotSkill) getControlHostPort() {
+	d.LogSomethingInfo("d.getControlHostPort()")
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://letsrobot.tv/get_control_host_port/" + d.myRobotID, nil)
 	if err != nil {
@@ -277,10 +333,11 @@ func (d *LetsRobotSkill) getControlHostPort() {
 		d.remoteControlPort = int(port)
     }
 
-	log.Info.Println( "getControlHostPort received: " + d.remoteURL + " on port:" + strconv.Itoa(d.remoteControlPort) )
+	d.LogSomethingInfo( "getControlHostPort received: " + d.remoteURL + " on port:" + strconv.Itoa(d.remoteControlPort) )
 }
 
 func (d *LetsRobotSkill) getVideoPort() {
+	d.LogSomethingInfo("d.getVideoPort()")
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://letsrobot.tv/get_video_port/" + d.myCameraID, nil)
 	if err != nil {
@@ -305,16 +362,16 @@ func (d *LetsRobotSkill) getVideoPort() {
 		d.remoteVideoPort = int(port)
     }
 
-	log.Info.Println( "getVideoPort received port:" + strconv.Itoa(d.remoteVideoPort) )
+	d.LogSomethingInfo( "getVideoPort received port:" + strconv.Itoa(d.remoteVideoPort) )
 }
 
 func (d *LetsRobotSkill) KillFFmpeg() {
-	log.Info.Println("KillFFmpeg()")
+	d.LogSomethingInfo("KillFFmpeg()")
 
 	d.streamingVideo = false
 	if d.ffmpegPID != 0 {
 
-		log.Info.Println("ffmpeg proces exists... killing ")
+		d.LogSomethingInfo("ffmpeg proces exists... killing ")
 		p, err := os.FindProcess(d.ffmpegPID)
 		
 		if err != nil{
@@ -330,7 +387,7 @@ func (d *LetsRobotSkill) KillFFmpeg() {
 }
 
 func (d *LetsRobotSkill) StartFFmpeg() {
-	log.Info.Println("StartFFmpeg()")
+	d.LogSomethingInfo("StartFFmpeg()")
 
 	d.streamingVideo = true
 	for d.streamingVideo == true {
@@ -338,7 +395,7 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 		url := "http://letsrobot.tv:" + strconv.Itoa( d.remoteVideoPort ) + "/hello/640/480/"
 		argstring := "-i /dev/video0 -f mpegts -codec:v mpeg1video -s 640x480 -b:v 350k -bf 0 -muxdelay 0.001 " + url
 
-		log.Info.Println("StartFFmpeg() connecting to: " + url)
+		d.LogSomethingInfo("StartFFmpeg() connecting to: " + url)
 
 		args := strings.Split(argstring," ")
 		cmd := exec.Command("/var/local/mind/skills/LetsRobotSkill/deps/local/bin/ffmpeg",args...)
@@ -350,7 +407,7 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 		    return
 		}
 
-		log.Info.Println("StartFFmpeg() Had no errors. Waiting for completion..." )
+		d.LogSomethingInfo("StartFFmpeg() running. Waiting for completion..." )
 
 		d.ffmpegPID = cmd.Process.Pid
 
@@ -361,7 +418,7 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 		time.Sleep(time.Second * 3)
 	}
 
-	log.Info.Println("d.streamingVideo == false...finished StartFFmpeg()")
+	d.LogSomethingInfo("d.streamingVideo == false...finished StartFFmpeg()")
 }
 
 func (d *LetsRobotSkill) SendLetsRobotStatus() {
@@ -374,7 +431,6 @@ func (d *LetsRobotSkill) SendLetsRobotStatus() {
 	
 	for _ = range d.intervalTimer.C {
 	    if d.ffmpegPID != 0 {
-	    	log.Info.Println("SendLetsRobotStatus()")
 			d.myClient.Emit("send_video_status", "{'send_video_process_exists': True, 'ffmpeg_process_exists': True, 'camera_id':"+d.myCameraID);
 			counter += 1
 			if counter == 60 {
