@@ -34,6 +34,12 @@ type ChatMessage struct {
 	AnonUser	bool	`json:"anonymous"`
 }
 
+type Message struct {
+    SendVideoProcessExists 	bool 	`json:"send_video_process_exists"`
+    FFMPEGProcessExists 	bool 	`json:"ffmpeg_process_exists"`
+    CameraID 				string 	`json:"camera_id"`
+}
+
 type LetsRobotSkill struct {
 	skill.Base
 	myClient *gosocketio.Client
@@ -120,10 +126,10 @@ func (d *LetsRobotSkill) OnRecvJSON(data []byte) {
     }
 
     d.getControlHostPort()
-	d.getVideoPort()
-	go d.connectSocketIO()
+    d.getVideoPort()
+    go d.connectSocketIO()
     go d.StartFFmpeg()
-	go d.SendLetsRobotStatus()
+    go d.SendLetsRobotStatus()
 }
 
 func (d *LetsRobotSkill) OnRecvString(data string) {
@@ -422,7 +428,7 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 }
 
 func (d *LetsRobotSkill) SendLetsRobotStatus() {
-	d.intervalTimer = time.NewTicker( time.Second )
+	d.intervalTimer = time.NewTicker( time.Second * 10 )
 	d.timerRunning = true
 	counter := 0
 	if d.streamingVideo == true {
@@ -431,9 +437,9 @@ func (d *LetsRobotSkill) SendLetsRobotStatus() {
 	
 	for _ = range d.intervalTimer.C {
 	    if d.ffmpegPID != 0 {
-			d.myClient.Emit("send_video_status", "{'send_video_process_exists': True, 'ffmpeg_process_exists': True, 'camera_id':"+d.myCameraID);
+	    	d.myClient.Emit("send_video_status", Message{SendVideoProcessExists:true, FFMPEGProcessExists:true, CameraID:d.myCameraID} )
 			counter += 1
-			if counter == 60 {
+			if counter == 6 {
 				d.myClient.Emit("identify_robot_id", d.myCameraID)
 				counter = 0
 			}
