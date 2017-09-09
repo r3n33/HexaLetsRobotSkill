@@ -205,7 +205,7 @@ func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 			hexabody.Pitch(d.currentPitch, d.currentMoveSpeed)
 		}
 	case "Faster":
-		if d.currentMoveSpeed > 300 {
+		if d.currentMoveSpeed > 100 {
 			d.currentMoveSpeed -= 100
 		}
 	case "Slower":
@@ -220,6 +220,14 @@ func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 		hexabody.StartMarching()
 	case "StopMarch":
 		hexabody.StopMarching()
+	case "GaitOriginal":
+		hexabody.SelectGait(hexabody.GaitOriginal)
+	case "GaitWave":
+		hexabody.SelectGait(hexabody.GaitWave)
+	case "GaitRipple":
+		hexabody.SelectGait(hexabody.GaitRipple)
+	case "GaitTripod":
+		hexabody.SelectGait(hexabody.GaitTripod)
 	case "PitchUp":
 		if d.currentPitch < 30.0 {
 			d.currentPitch += 5.0

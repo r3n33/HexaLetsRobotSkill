@@ -1,9 +1,13 @@
 {
     "name": "LetsRobotSkill",
     "skillID": "LetsRobotSkill",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "author": "renee1382@gmail.com",
  	"remote": {
      "orientation": "portrait"
  	}
+ 	,
+ 	"devicesPermission": [
+     "video"
+ 	]
 }

@@ -64,6 +64,27 @@
             ]
          },
          {  
+            "button_panel_label":"walking patterns",
+            "buttons":[ 
+               {  
+                  "label":"Gait Normal",
+                  "command":"GaitNormal"
+               },
+               {  
+                  "label":"Gait Wave",
+                  "command":"GaitWave"
+               }, 
+               {  
+                  "label":"Gait Ripple",
+                  "command":"GaitRipple"
+               }, 
+               {  
+                  "label":"Gait Tripod",
+                  "command":"GaitTripod"
+               }
+            ]
+         },
+         {  
             "button_panel_label":"defaults",
             "buttons":[ 
                {  
