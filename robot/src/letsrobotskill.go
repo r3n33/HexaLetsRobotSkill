@@ -50,6 +50,8 @@ type LetsRobotSkill struct {
 	allowAnonControl bool
 	allowAnonChat bool
 
+	depsFolder string
+
 	myRobotID string
 	myCameraID string
 	remoteURL string
@@ -61,6 +63,9 @@ type LetsRobotSkill struct {
 	timerRunning bool
 	intervalTimer *time.Ticker
 	nextControlTime time.Time
+
+	batteryLevel int
+	charging bool
 }
 
 func NewSkill() skill.Interface {
@@ -69,6 +74,8 @@ func NewSkill() skill.Interface {
 
 func (d *LetsRobotSkill) OnStart() {
 	d.LogSomethingInfo("OnStart()")
+
+	d.depsFolder = "/var/local/mind/skills/LetsRobotSkill/deps/"
 
 	d.allowAnonControl = false
 	d.allowAnonChat = false
@@ -129,7 +136,7 @@ func (d *LetsRobotSkill) OnRecvJSON(data []byte) {
     d.getVideoPort()
     go d.connectSocketIO()
     go d.StartFFmpeg()
-    go d.SendLetsRobotStatus()
+    go d.StatusIntervalFunction()
 }
 
 func (d *LetsRobotSkill) OnRecvString(data string) {
@@ -223,10 +230,13 @@ func (d *LetsRobotSkill) HexaDoCommand( cmd string ) {
 	case "GaitOriginal":
 		hexabody.SelectGait(hexabody.GaitOriginal)
 	case "GaitWave":
+		hexabody.SelectGait(hexabody.GaitOriginal)
 		hexabody.SelectGait(hexabody.GaitWave)
 	case "GaitRipple":
+		hexabody.SelectGait(hexabody.GaitOriginal)
 		hexabody.SelectGait(hexabody.GaitRipple)
 	case "GaitTripod":
+		hexabody.SelectGait(hexabody.GaitOriginal)
 		hexabody.SelectGait(hexabody.GaitTripod)
 	case "PitchUp":
 		if d.currentPitch < 30.0 {
@@ -405,23 +415,28 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 
 	d.streamingVideo = true
 	for d.streamingVideo == true {
+		serverurl := "http://letsrobot.tv:" + strconv.Itoa( d.remoteVideoPort ) + "/hello/640/480/"
 
-		url := "http://letsrobot.tv:" + strconv.Itoa( d.remoteVideoPort ) + "/hello/640/480/"
-		argstring := "-i /dev/video0 -f mpegts -codec:v mpeg1video -s 640x480 -b:v 350k -bf 0 -muxdelay 0.001 " + url
+		//TODO: overlayCommand := "-vf dynoverlay=overlayfile=/dev/shm/battery.png:check_interval=1000:x=0:y=0,dynoverlay=overlayfile=/dev/shm/charging.png:check_interval=1000:x=0:y=0 "
 
-		d.LogSomethingInfo("StartFFmpeg() connecting to: " + url)
+		argstring := "-i /dev/video0 -f mpegts -codec:v mpeg1video -s 640x480 -b:v 350k -bf 0 -muxdelay 0.001 " + serverurl //+ overlayCommand + serverurl
 
-		args := strings.Split(argstring," ")
-		cmd := exec.Command("/var/local/mind/skills/LetsRobotSkill/deps/local/bin/ffmpeg",args...)
+		d.LogSomethingInfo( "StartFFmpeg() connecting to: " + serverurl )
+
+		d.LogSomethingInfo( "FFMPEG CMD: " + d.depsFolder + "local/bin/./ffmpeg " + argstring )
+
+		args := strings.Split( argstring, " " )
+
+		cmd := exec.Command( d.depsFolder + "local/bin/ffmpeg", args... )
 		
 		err := cmd.Start()
 
 		if err != nil {
-		    log.Fatal.Println(err)
+		    log.Fatal.Println( err )
 		    return
 		}
 
-		d.LogSomethingInfo("StartFFmpeg() running. Waiting for completion..." )
+		d.LogSomethingInfo( "StartFFmpeg() running. Waiting for completion..." )
 
 		d.ffmpegPID = cmd.Process.Pid
 
@@ -435,22 +450,70 @@ func (d *LetsRobotSkill) StartFFmpeg() {
 	d.LogSomethingInfo("d.streamingVideo == false...finished StartFFmpeg()")
 }
 
-func (d *LetsRobotSkill) SendLetsRobotStatus() {
-	d.intervalTimer = time.NewTicker( time.Second * 10 )
+func copyFile(srcFolder string, destFolder string){
+	cpCmd := exec.Command("cp", "-rf", srcFolder, destFolder)
+	err := cpCmd.Run()
+	if err != nil {
+	    log.Fatal.Println( err )
+	    return
+	}
+}
+
+func (d *LetsRobotSkill) GetIndexedBatteryLevel() int {
+	
+	if d.batteryLevel > 85 {
+		return 85
+	} else if d.batteryLevel > 50 {
+		return 50
+	} else if d.batteryLevel > 30 {
+		return 30
+	} else if d.batteryLevel > 10 {
+		return 10
+	}
+
+	return 0
+}
+
+func (d *LetsRobotSkill) StatusIntervalFunction() {
+	d.intervalTimer = time.NewTicker( time.Second )
 	d.timerRunning = true
 	counter := 0
 	if d.streamingVideo == true {
 		d.myClient.Emit("identify_robot_id", d.myCameraID)
 	}
 	
+	lastcharging := !d.charging
+	lastbattery := -1
+	tensecondinterval := 0
+
 	for _ = range d.intervalTimer.C {
-	    if d.ffmpegPID != 0 {
-	    	d.myClient.Emit("send_video_status", Message{SendVideoProcessExists:true, FFMPEGProcessExists:true, CameraID:d.myCameraID} )
-			counter += 1
-			if counter == 6 {
-				d.myClient.Emit("identify_robot_id", d.myCameraID)
-				counter = 0
+		if d.charging != lastcharging {
+			lastcharging = d.charging
+			/*
+			if d.charging {
+				copyFile(  fmt.Sprintf( "%shud/charging.png", d.depsFolder ), "/dev/shm/charging.png" )
+			} else {
+				os.Remove( "/dev/shm/charging.png" )
 			}
-	    }
+			*/
+		}
+
+		if d.GetIndexedBatteryLevel() != lastbattery {
+			//copyFile(  fmt.Sprintf( "%shud/battery-%02d.png", d.depsFolder, d.GetIndexedBatteryLevel() ), "/dev/shm/battery.png" )
+			lastbattery = d.GetIndexedBatteryLevel()
+		}
+
+		tensecondinterval += 1
+		if tensecondinterval >= 10 {
+			tensecondinterval = 0
+		    if d.ffmpegPID != 0 {
+		    	d.myClient.Emit("send_video_status", Message{SendVideoProcessExists:true, FFMPEGProcessExists:true, CameraID:d.myCameraID} )
+				counter += 1
+				if counter >= 6 {
+					d.myClient.Emit("identify_robot_id", d.myCameraID)
+					counter = 0
+				}
+		    }
+		}
 	}
 }

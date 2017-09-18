@@ -23,19 +23,13 @@
 						robot.sendData({
 							skillID: skillID, 
 							data: {"robotid":storage.getItem("robotid"), "cameraid":storage.getItem("cameraid")}
-						})
-
-						document.getElementById("loginpanel").style.display = "none"
-						document.getElementById("consolepanel").style = ""						
+						})					
 					}
 					document.getElementById("disconnect").onclick = function() {
 						robot.sendData({
 							skillID: skillID, 
 							data: "disconnect"
 						})
-
-						document.getElementById("loginpanel").style = ""
-						document.getElementById("consolepanel").style.display = "none"
 					}
 					setInterval(function(){ 
 						robot.getInfo({
@@ -57,7 +51,10 @@
 	</head>
 	<body bgcolor="363636">
 		<h2>&nbsp;</h2>
-		<img id="img" alt="img" src="LogoLong.png" style="max-width: 100%;"/><br/>
+
+		<div align="center">
+			<img id="img" alt="img" src="LogoLong.png" style="max-width: 100%;"/>
+		</div>
 
 		<div id="loginpanel">
 			<table style="margin: 0px auto;">
@@ -81,7 +78,7 @@
 			</tr>
 			</table>
 		</div>
-		<div style="width:90%;display:none" id="consolepanel" align="center">
+		<div style="width:90%;" id="consolepanel" align="center">
 		    <textarea id="consoletext" style="color:white;width:95%; height:250px;white-space: pre; overflow: scroll;resize: none;background-color: rgba(0, 0, 0, 0); border-color: rgba(0, 0, 0, 0)" wrap="off"></textarea>
 		</div>
 		<div align="center">
